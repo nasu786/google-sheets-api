@@ -2,6 +2,10 @@
 import { useState } from 'react'
 import { GoogleSpreadsheet } from "google-spreadsheet";
 import axios from 'axios';
+import AWS from 'aws-sdk';
+import fs from 'fs'
+
+import dataaa from '../test.json'
 
 export default function Home() {
   const [name, setName] = useState('');
@@ -9,6 +13,17 @@ export default function Home() {
   const [mobileNumber, setMobileNumber] = useState('');
   const [submitLoader, setSubmitLoader] = useState("");
   const [sucess, setSuccess] = useState(false);
+
+  console.log(dataaa.data.map(item => item["Start Date"]))
+
+  function writeToFile(data) {
+    fs.writeFileSync('test.txt', data, (err) => {
+      if (err) throw err;
+      console.log('Data written to file');
+    });
+  }
+
+  // writeToFile("Helol")
 
   // submit event
   const handleSubmit = (e) => {
@@ -50,36 +65,89 @@ export default function Home() {
 
         const sheet = doc.sheetsById[SHEET_ID];
         const rows = await sheet.getRows()
-        if (rows.every(item => item.Email !== email && item.MobileNumber !== mobileNumber)) {
-          await sheet.addRow(row);
-          setSubmitLoader(false);
-          setSuccess("Form has been Updated Successfully.");
-        } else {
-          setSubmitLoader(false);
-          setSuccess(`Email or Mobile Number already exists!.`);
-          console.log(rows.every(item => item.Email === email), rows.every(item => item.mobileNumber === mobileNumber))
-        }
+        console.log(sheet)
+        console.log(rows)
+      
+        navigator.clipboard.writeText(rows.map(item => JSON.stringify({
+          id: item.SNo,
+          Event: item.Event ? item.Event : " ",
+          City: item["City"] ? item["City"] : " ",
+          ["Venue Location"]: item["Venue"] ? item["Venue"] : " ",
+          Zone: item.Zone ? item.Zone : " ",
+          state: item.State ?item.State : " " ,
+          ["Start Date"]: item["Start Date"] ? item["Start Date"] : " ",
+          ["End Date"]: item["End Date"] ? item["End Date"] : " ",
+          Confirmed_Tentative: item["Status"] ? item["Status"] : " "
+
+        })))
+        // if (rows.every(item => item.Email !== email && item.MobileNumber !== mobileNumber)) {
+        //   await sheet.addRow(row);
+        //   setSubmitLoader(false);
+        //   setSuccess("Form has been Updated Successfully.");
+        // } else {
+        //   setSubmitLoader(false);
+        //   setSuccess(`Email or Mobile Number already exists!.`);
+        //   console.log(rows.every(item => item.Email === email), rows.every(item => item.mobileNumber === mobileNumber))
+        // }
       } catch (e) {
         console.error("Error: ", e);
       }
     };
 
     const create = async () => {
-      const newSheet = await doc.addSheet({ title: 'Timesheet' });
-      console.log(newSheet)
+      // const newSheet = await doc.addSheet({ title: 'Timesheet' });
+      const sheet = await doc.addSheet({ headerValues: ['name', 'email'] });
+      console.log(sheet)
     }
 
-    create();
-    
-    appendSpreadsheet({ Name: name, Email: email, MobileNumber: mobileNumber})
+    // create();
+
+    appendSpreadsheet({ Name: name, Email: email, MobileNumber: mobileNumber })
   }
 
+  const [emailSent, setEmailSent] = useState(false);
 
+  const sendEmail = async () => {
+    AWS.config.update({
+      accessKeyId: 'AKIA3IZBS3QE64WFWRM7',
+      secretAccessKey: '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',
+      region: 'ap-south-1'
+    });
+
+    const ses = new AWS.SES();
+
+    const params = {
+      Destination: {
+        ToAddresses: ['mohamednasrutheen777@gmail.com']
+      },
+      Message: {
+        Body: {
+          Text: {
+            Charset: 'UTF-8',
+            Data: 'This is the message body'
+          }
+        },
+        Subject: {
+          Charset: 'UTF-8',
+          Data: 'Test email from Amazon SES'
+        }
+      },
+      Source: 'webmaster@heartfulness.org'
+    };
+
+    try {
+      await ses.sendEmail(params).promise();
+      setEmailSent(true);
+    } catch (error) {
+      console.error(error);
+    }
+
+  }
   return (
     <div className="container">
       <div className='row justify-content-md-center mt-5'>
         <div style={{ width: "60%" }}>
-          <h4 className='text-center'>Save Form Data in Google Sheets</h4>
+          <h4 className='text-center' onClick={sendEmail}>Save Form Data in Google Sheets</h4>
           <br></br>
           <form autoComplete="off" className='form-group'
             onSubmit={handleSubmit}>
@@ -114,7 +182,7 @@ export default function Home() {
                 </div>
               )}
               {sucess && (
-                <div className={sucess.includes("exists")? "text-danger" : "text-success"} style={{ marginTop: `5px` }}>
+                <div className={sucess.includes("exists") ? "text-danger" : "text-success"} style={{ marginTop: `5px` }}>
                   {sucess}
                 </div>
               )}
@@ -125,3 +193,4 @@ export default function Home() {
     </div>
   )
 }
+
